@@ -1,0 +1,193 @@
+local Lighting = game["Lighting"]
+local SunLight = Lighting["SunLight"]
+local GradientSky = game["Environment"]["GradientSky"]
+
+-- ========================================
+-- SETTINGS
+-- ========================================
+
+local DurationInSeconds = 480
+
+local PeakSunBrightness = 1.5
+
+local PhaseDuration = DurationInSeconds / 4
+
+-- ========================================
+-- SKY COLORS
+-- ========================================
+
+local SkyColors = {
+    {
+        Color.FromHex("#ffffff"),
+        Color.FromHex("#e5a66a"),
+        Color.FromHex("#e79d72"),
+        Color.FromHex("#596c93"),
+        Color.FromHex("#d9c0a6")
+    },
+
+    {
+        Color.FromHex("#ffffff"),
+        Color.FromHex("#e5c6aa"),
+        Color.FromHex("#e7e2ca"),
+        Color.FromHex("#2978b1"),
+        Color.FromHex("#92b0d9")
+    },
+
+    {
+        Color.FromHex("#ffffff"),
+        Color.FromHex("#e5c196"),
+        Color.FromHex("#e79d72"),
+        Color.FromHex("#4f5f93"),
+        Color.FromHex("#d9a662")
+    },
+
+    {
+        Color.FromHex("#000000"),
+        Color.FromHex("#000000"),
+        Color.FromHex("#000000"),
+        Color.FromHex("#000000"),
+        Color.FromHex("#282e39")
+    },
+
+    -- Morning again
+    {
+        Color.FromHex("#ffffff"),
+        Color.FromHex("#e5a66a"),
+        Color.FromHex("#e79d72"),
+        Color.FromHex("#596c93"),
+        Color.FromHex("#d9c0a6")
+    }
+}
+
+-- ========================================
+-- SKY PROPERTIES
+-- ========================================
+
+local SkyProperties = {
+    "SunDiscColor",
+    "SunHaloColor",
+    "HorizonLineColor",
+    "SkyGradientTop",
+    "SkyGradientBottom"
+}
+
+-- ========================================
+-- SUN ROTATION
+-- ========================================
+
+local SunRotation = SunLight.Rotation
+
+local OriginalY = SunRotation.Y
+local OriginalZ = SunRotation.Z
+
+local SunPositions = {
+    0,    -- Morning
+    90,   -- Daytime
+    180,  -- Sunset
+    270,  -- Snack Time
+    360   -- Morning
+}
+
+-- ========================================
+-- BRIGHTNESS
+-- ========================================
+
+SunLight.Brightness = PeakSunBrightness
+
+-- ========================================
+-- CYCLE
+-- ========================================
+
+local Elapsed = 0
+
+SunLight.Rotation = Vector3.New(
+    0,
+    OriginalY,
+    OriginalZ
+)
+
+Hooks.Updated:Connect(function(DeltaTime)
+
+    Elapsed = Elapsed + DeltaTime
+
+    -- ====================================
+    -- CYCLE TIME
+    -- ====================================
+
+    local CycleTime = Elapsed % DurationInSeconds
+
+    local PhaseIndex = math.floor(
+        CycleTime / PhaseDuration
+    )
+
+    local PhaseTime = CycleTime % PhaseDuration
+
+    local Alpha = PhaseTime / PhaseDuration
+
+    -- ====================================
+    -- SUN ROTATION
+    -- ====================================
+
+    local StartRotation = SunPositions[PhaseIndex + 1]
+    local EndRotation = SunPositions[PhaseIndex + 2]
+
+    local CurrentX =
+        StartRotation + (EndRotation - StartRotation) * Alpha
+
+    if CurrentX > 180 then
+        CurrentX = CurrentX - 360
+    end
+
+    SunLight.Rotation = Vector3.New(
+        CurrentX,
+        OriginalY,
+        OriginalZ
+    )
+
+    -- ====================================
+    -- SUN BRIGHTNESS
+    -- ====================================
+
+    local CurrentBrightness
+
+    if PhaseIndex == 0 or PhaseIndex == 1 then
+
+        -- Morning and Daytime
+        CurrentBrightness = PeakSunBrightness
+
+    elseif PhaseIndex == 2 then
+
+        -- Sunset: 1.5 -> 0
+        CurrentBrightness =
+            PeakSunBrightness * (1 - Alpha)
+
+    else
+
+        -- Snack Time: 0 -> 1.5
+        CurrentBrightness =
+            PeakSunBrightness * Alpha
+
+    end
+
+    SunLight.Brightness = CurrentBrightness
+
+    -- ====================================
+    -- SKY COLOR TRANSITIONS
+    -- ====================================
+
+    local StartColors = SkyColors[PhaseIndex + 1]
+    local EndColors = SkyColors[PhaseIndex + 2]
+
+    for i = 1, 5 do
+
+        local CurrentColor = Color.Lerp(
+            StartColors[i],
+            EndColors[i],
+            Alpha
+        )
+
+        GradientSky[SkyProperties[i]] = CurrentColor
+
+    end
+
+end)
